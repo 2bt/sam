@@ -8,7 +8,7 @@ LFLAGS = `sdl-config --libs`
 
 # no libsdl present
 #CFLAGS =  -Wall -O2
-#LFLAGS = 
+#LFLAGS =
 
 sam: $(OBJS)
 	$(CC) -o sam $(OBJS) $(LFLAGS)
@@ -16,7 +16,7 @@ sam: $(OBJS)
 %.o: src/%.c
 	$(CC) $(CFLAGS) -c $<
 
-package: 
+package:
 	tar -cvzf sam.tar.gz README.md Makefile sing src/
 
 clean:
