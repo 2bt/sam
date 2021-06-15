@@ -77,7 +77,7 @@ void PrintUsage()
 	printf("	-debug			print additional debug messages\n");
 	printf("\n");
 
-	
+
 	printf("     VOWELS                            VOICED CONSONANTS	\n");
 	printf("IY           f(ee)t                    R        red		\n");
 	printf("IH           p(i)n                     L        allow		\n");
@@ -106,14 +106,13 @@ void PrintUsage()
 	printf("UL           sett(le) (=AXL)           T         talk		\n");
 	printf("UM           astron(omy) (=AXM)        K         cake		\n");
 	printf("UN           functi(on) (=AXN)         CH        speech		\n");
-	printf("Q            kitt-en (glottal stop)    /H        a(h)ead	\n");	
+	printf("Q            kitt-en (glottal stop)    /H        a(h)ead	\n");
 }
 
 #ifdef USESDL
 
 int pos = 0;
-void MixAudio(void *unused, Uint8 *stream, int len)
-{
+void MixAudio(void *unused, Uint8 *stream, int len) {
 	int bufferpos = GetBufferLength();
 	char *buffer = GetBuffer();
 	int i;
@@ -130,7 +129,6 @@ void MixAudio(void *unused, Uint8 *stream, int len)
 void OutputSound()
 {
 	int bufferpos = GetBufferLength();
-	bufferpos /= 50;
 	SDL_AudioSpec fmt;
 
 	fmt.freq = 22050;
@@ -141,19 +139,13 @@ void OutputSound()
 	fmt.userdata = NULL;
 
 	/* Open the audio device and start playing sound! */
-	if ( SDL_OpenAudio(&fmt, NULL) < 0 ) 
+	if ( SDL_OpenAudio(&fmt, NULL) < 0 )
 	{
 		printf("Unable to open audio: %s\n", SDL_GetError());
 		exit(1);
 	}
 	SDL_PauseAudio(0);
-	//SDL_Delay((bufferpos)/7);
-	
-	while (pos < bufferpos)
-	{
-		SDL_Delay(100);
-	}
-	
+	while (pos < bufferpos) SDL_Delay(100);
 	SDL_CloseAudio();
 }
 
@@ -161,7 +153,7 @@ void OutputSound()
 
 void OutputSound() {}
 
-#endif	
+#endif
 
 int debug = 0;
 
@@ -171,9 +163,7 @@ int main(int argc, char **argv)
 	int phonetic = 0;
 
 	char* wavfilename = NULL;
-	unsigned char input[256];
-	
-	memset(input, 0, 256);
+	char input[256] = {};
 
 	if (argc <= 1)
 	{
@@ -186,8 +176,8 @@ int main(int argc, char **argv)
 	{
 		if (argv[i][0] != '-')
 		{
-			strcat_s((char*)input, 256, argv[i]);
-			strcat_s((char*)input, 256, " ");
+			strcat_s(input, 256, argv[i]);
+			strcat_s(input, 256, " ");
 		} else
 		{
 			if (strcmp(&argv[i][1], "wav")==0)
@@ -232,29 +222,26 @@ int main(int argc, char **argv)
 				return 1;
 			}
 		}
-		
+
 		i++;
 	} //while
 
-	for(i=0; input[i] != 0; i++)
-		input[i] = (unsigned char)toupper((int)input[i]);
+	for(i=0; input[i] != 0; i++) input[i] = toupper(input[i]);
 
-	if (debug)
-	{
+	if (debug) {
 		if (phonetic) printf("phonetic input: %s\n", input);
-		else printf("text input: %s\n", input); 
+		else printf("text input: %s\n", input);
 	}
-	
-	if (!phonetic)
-	{
+
+	if (!phonetic) {
 		strcat_s((char*)input, 256, "[");
 		if (!TextToPhonemes(input)) return 1;
-		if (debug)
-			printf("phonetic input: %s\n", input);
-	} else strcat_s((char*)input, 256, "\x9b");
+		if (debug) printf("phonetic input: %s\n", input);
+	}
+    else strcat_s((char*)input, 256, "\x9b");
 
 #ifdef USESDL
-	if ( SDL_Init(SDL_INIT_AUDIO) < 0 ) 
+	if ( SDL_Init(SDL_INIT_AUDIO) < 0 )
 	{
 		printf("Unable to init SDL: %s\n", SDL_GetError());
 		exit(1);
@@ -269,8 +256,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (wavfilename != NULL) 
-		WriteWav(wavfilename, GetBuffer(), GetBufferLength()/50);
+	if (wavfilename != NULL)
+		WriteWav(wavfilename, GetBuffer(), GetBufferLength());
 	else
 		OutputSound();
 
