@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "render.h"
 #include "RenderTabs.h"
@@ -59,12 +58,6 @@ static const int timetable[5][5] = {
 };
 
 void Output(int index, unsigned char A) {
-//    for (int i = 0; i < 3 - index; ++i) {
-//        buffer[bufferpos / 50] = (A & 0xf) * 16;
-//        bufferpos += 50;
-//    }
-//    return;
-
     static unsigned oldtimetableindex = 0;
     bufferpos += timetable[oldtimetableindex][index];
     oldtimetableindex = index;
@@ -77,7 +70,7 @@ static unsigned char RenderVoicedSample(unsigned short hi, unsigned char off, un
     do {
         unsigned char sample = sampleTable[hi+off];
         for (int bit = 0; bit < 8; ++bit) {
-            if ((sample & 128) != 0) Output(3, 26);
+            if ((sample & 128) != 0) Output(3, 10);
             else                     Output(4, 6);
             sample <<= 1;
         }
@@ -294,18 +287,6 @@ void Render()
     if (debug) {
         PrintOutput(sampledConsonantFlag, frequency1, frequency2, frequency3, amplitude1, amplitude2, amplitude3, pitches);
     }
-
-
-//    FILE* f = fopen("o", "a");
-//    for (int i = 0; i < t; ++i) {
-//        fprintf(f, "%2X %2X %2X %2X %2X %2X %2X %2X\n",
-//                sampledConsonantFlag[i],
-//                frequency1[i], frequency2[i], frequency3[i],
-//                amplitude1[i], amplitude2[i], amplitude3[i],
-//                pitches[i]);
-//    }
-//    fclose(f);
-
 
     ProcessFrames(t);
 }

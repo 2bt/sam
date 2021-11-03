@@ -1,5 +1,6 @@
 #include "render.h"
 #include <stdint.h>
+#include <stdio.h>
 
 extern uint8_t speed;
 
@@ -24,8 +25,8 @@ static void CombineGlottalAndFormants(uint8_t phase1, uint8_t phase2, uint8_t ph
     unsigned int tmp = 0;
     tmp  += multtable[sinus[phase1]     | amplitude1[Y]];
     tmp  += multtable[sinus[phase2]     | amplitude2[Y]];
-    tmp  += tmp > 255 ? 1 : 0; // if addition above overflows, we for some reason add one;
-    tmp  += multtable[rectangle[phase3] | amplitude3[Y]];
+//    tmp  += tmp > 255 ? 1 : 0; // if addition above overflows, we for some reason add one;
+//    tmp  += multtable[rectangle[phase3] | amplitude3[Y]];
     tmp  += 136;
     tmp >>= 4; // Scale down to 0..15 range of C64 audio.
 
@@ -41,7 +42,19 @@ static void CombineGlottalAndFormants(uint8_t phase1, uint8_t phase2, uint8_t ph
 // To simulate them being driven by the glottal pulse, the waveforms are
 // reset at the beginning of each glottal pulse.
 //
-void ProcessFrames(uint8_t mem48) {
+void ProcessFrames(uint8_t len) {
+
+    FILE* f = fopen("o", "a");
+    for (int i = 0; i < len; ++i) {
+        fprintf(f, "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+                sampledConsonantFlag[i],
+                frequency1[i], frequency2[i], frequency3[i],
+                amplitude1[i], amplitude2[i], amplitude3[i],
+                pitches[i]);
+    }
+    fclose(f);
+
+
     uint8_t speedcounter = 72;
     uint8_t phase1 = 0;
     uint8_t phase2 = 0;
@@ -53,7 +66,7 @@ void ProcessFrames(uint8_t mem48) {
     uint8_t glottal_pulse = pitches[0];
     uint8_t mem38 = glottal_pulse - (glottal_pulse >> 2); // mem44 * 0.75
 
-    while(mem48) {
+    while(len) {
         uint8_t flags = sampledConsonantFlag[Y];
 
         // unvoiced sampled phoneme?
@@ -61,7 +74,7 @@ void ProcessFrames(uint8_t mem48) {
             RenderSample(&mem66, flags, Y);
             // skip ahead two in the phoneme buffer
             Y += 2;
-            mem48 -= 2;
+            len -= 2;
             speedcounter = speed;
         } else {
             CombineGlottalAndFormants(phase1, phase2, phase3, Y);
@@ -70,8 +83,8 @@ void ProcessFrames(uint8_t mem48) {
             if (speedcounter == 0) {
                 Y++; //go to next amplitude
                 // decrement the frame count
-                mem48--;
-                if(mem48 == 0) return;
+                len--;
+                if(len == 0) return;
                 speedcounter = speed;
             }
 
@@ -94,7 +107,7 @@ void ProcessFrames(uint8_t mem48) {
                 // voiced sampled phonemes interleave the sample with the
                 // glottal pulse. The sample flag is non-zero, so render
                 // the sample for the phoneme.
-                RenderSample(&mem66, flags,Y);
+                RenderSample(&mem66, flags, Y);
             }
         }
 

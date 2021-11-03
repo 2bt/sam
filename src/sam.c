@@ -38,8 +38,7 @@ int bufferpos=0;
 char *buffer = NULL;
 
 
-void SetInput(unsigned char *_input)
-{
+void SetInput(unsigned char *_input) {
 	int i, l;
 	l = strlen((char*)_input);
 	if (l > 254) l = 254;
