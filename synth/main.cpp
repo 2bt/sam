@@ -7,7 +7,7 @@
 #include <SDL2/SDL.h>
 
 enum {
-    MIXRATE = 22050
+    MIXRATE = 22050 * 2
 };
 
 
@@ -26,119 +26,77 @@ void write_sample(float x) {
 }
 
 
-//float osc(float x) { return sinf(x * 2 * M_PI); }
-float osc(float x) { return fabs(fmod(x, 1) * 4 - 2) - 1; }
-//float osc(float x) { return fmod(x, 1) * 2 - 1; }
+float osc_sin(float x) { return sinf(x * 2 * M_PI); }
+float osc_tri(float x) { return fabs(fmod(x, 1) * 4 - 2) - 1; }
+float osc_saw(float x) { return fmod(x, 1) * 2 - 1; }
+float osc_rec(float x) { return fmod(x, 1) > 0.5 ? 1 : -1; }
 
 
-float Noise(int type) {
-    assert(type >= 0 && type < 5);
-    static const float speeds[5] = {
-        1,
-        0.9,
-        0.4,
-        0.3,
-        0.2,
-    };
-    static float phase = 0;
-    static float amp   = 0;
+class FrameProcessor {
+public:
+    void process() {
+        int   speed  = 70 * MIXRATE / 22050;
+        int   phase  = 0;
+        float phase1 = 0;
+        float phase2 = 0;
+        float phase3 = 0;
 
-    phase += speeds[type];
-    int iphase = phase;
-    phase -= iphase;
-    if (iphase) amp = rand() * 2.0f / RAND_MAX - 1;
-    return amp * 8;
-}
+        for (size_t Y = 0; Y < pitches.size(); ++Y) {
+            int flags = sampledConsonantFlag[Y];
 
-
-float CombineGlottalAndFormants(int phase1, int phase2, int phase3, int Y) {
-    float x = 0;
-    x += osc(phase1 / 256.0f) * (amplitude1[Y] > 0 ? 15 : 0);
-    x += osc(phase2 / 256.0f) * (amplitude2[Y] > 0 ? 8 : 0);
-//    x += osc(phase3 / 256.0f) * (amplitude3[Y] > 0 ? 4 : 0);
-    return x;
-}
-
-
-
-void ProcessFrames(int mem48) {
-    int speed = 80;
-
-    int speedcounter = speed;
-    float phase1 = 0;
-    float phase2 = 0;
-    float phase3 = 0;
-
-    int Y = 0;
-
-    int glottal_pulse = pitches[0];
-    int mem38 = glottal_pulse - (glottal_pulse >> 2); // mem44 * 0.75
-
-    while (Y < mem48) {
-        int flags = sampledConsonantFlag[Y];
-
-        if (flags & 0b11111000) {
-            // unvoiced sampled phoneme
-
-            int len = (flags & 0b11111000) * 8 + 8;
-
-            // quantize length
-            int frame_len = MIXRATE / 50;
-            int frame_count = (len + frame_len / 2) / frame_len;
-            if (frame_count == 0) frame_count = 1;
-            len = frame_count * frame_len;
-
-            for (int i = 0; i < len; ++i) {
-                write_sample(Noise((flags & 7) - 1));
+            if (flags & 0b11111000) {
+                // unvoiced sampled phoneme
+                int len = (flags & 0b11111000) * 8 + 8;
+                len = len * (MIXRATE / 22050.0f);
+                for (int i = 0; i < len; ++i) write_sample(noise((flags & 7) - 1));
+                ++Y; // skip next frame
+                continue;
             }
 
-            Y += 2;
-            speedcounter = speed;
-        } else {
-
-            for (int i = 0; i < 3; ++i) {
-                float x = CombineGlottalAndFormants(phase1, phase2, phase3, Y);
-                if (flags) x += Noise((flags & 7) - 1);
-                write_sample(x);
-                phase1 += frequency1[Y] / 3.0f;
-                if (!flags)
-                {
-                    phase2 += frequency2[Y] / 3.0f;
-                    phase3 += frequency3[Y] / 3.0f;
+            for (int _ = 0; _ < speed; ++_) {
+                float pitch = pitches[Y] * (MIXRATE / 22050.0f);
+                for (int i = 0; i < 3; ++i) {
+                    float x = 0;
+                    if (flags && phase > pitch * 0.75f) x = noise((flags & 7) - 1);
+                    else {
+                        x += osc_tri(phase1) * amplitude1[Y];
+                        x += osc_tri(phase2) * amplitude2[Y];
+                        x += osc_tri(phase3) * amplitude3[Y];
+                        phase1 += frequency1[Y] * (22050.0f / MIXRATE / 3 / 256);
+                        phase2 += frequency2[Y] * (22050.0f / MIXRATE / 3 / 256);
+                        phase3 += frequency3[Y] * (22050.0f / MIXRATE / 3 / 256);
+                    }
+                    write_sample(x);
+                }
+                if (++phase >= pitch) {
+                    phase  = 0;
+                    phase1 = 0;
+                    phase2 = 0;
+                    phase3 = 0;
                 }
             }
-
-
-            speedcounter--;
-            if (speedcounter == 0) {
-                speedcounter = speed;
-                Y++;
-            }
-
-            --glottal_pulse;
-            //XXX
-            if (glottal_pulse != 0) continue;
-
-//            if (glottal_pulse != 0) {
-//                // within the first 75% of the glottal pulse?
-//                // is the count non-zero and the sampled flag is zero?
-//                --mem38;
-//                if (--mem38 != 0 || flags == 0) continue;
-//
-//                Noise((flags & 7) - 1, pitches[Y] * 3 / 4);
-//            }
-
-            glottal_pulse = pitches[Y];
-            mem38 = glottal_pulse - (glottal_pulse >> 2); // mem44 * 0.75
-
-            // reset the formant wave generators to keep them in
-            // sync with the glottal pulse
-            phase1 = 0;
-//            phase2 = 0;
-//            phase3 = 0;
         }
     }
-}
+
+private:
+
+    float noise(int speed) {
+        assert(speed >= 0 && speed < 5);
+        static const float SPEEDS[5] = { 1, 0.9, 0.4, 0.3, 0.2 };
+        m_noise_phase += SPEEDS[speed] * (22050.0f / MIXRATE);
+        if (m_noise_phase > 0) {
+            m_noise_phase -= int(m_noise_phase);
+            m_noise_amp = rand() * 2.0f / RAND_MAX - 1;
+        }
+        return m_noise_amp * 8;
+    }
+
+    float m_noise_phase = 0;
+    float m_noise_amp   = 0;
+};
+
+
+
 
 void usage(char const* prog) {
     printf("usage: %s file\n", prog);
@@ -165,7 +123,7 @@ int main(int argc, char** argv) {
     }
     fclose(f);
 
-    ProcessFrames(pitches.size());
+    FrameProcessor().process();
 
 	SF_INFO info = { 0, MIXRATE, 1, SF_FORMAT_WAV | SF_FORMAT_PCM_16 };
     SNDFILE* wav = sf_open("log.wav", SFM_WRITE, &info);
